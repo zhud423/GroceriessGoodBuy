@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowJs": false,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "incremental": true,
+    "baseUrl": ".",
+    "paths": {
+      "@life-assistant/contracts": ["packages/contracts/src/index.ts"],
+      "@life-assistant/db": ["packages/db/src/index.ts"],
+      "@life-assistant/domain": ["packages/domain/src/index.ts"],
+      "@life-assistant/shared": ["packages/shared/src/index.ts"]
+    }
+  }
+}

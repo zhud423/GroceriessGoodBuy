@@ -1,0 +1,287 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Platform {
+  HEMA
+  XIAOXIANG
+  QIXIAN
+  SAMS
+}
+
+enum InventoryStatus {
+  UNKNOWN
+  SUFFICIENT
+  LOW
+  OUT
+}
+
+enum Currency {
+  CNY
+}
+
+enum OrderStatus {
+  DRAFT
+  ACTIVE
+}
+
+enum OrderItemResolutionStatus {
+  PENDING
+  MATCHED_EXISTING
+  CREATED_NEW_PRODUCT
+}
+
+enum ImportSessionStatus {
+  DRAFT
+  PROCESSING
+  REVIEW_REQUIRED
+  READY_TO_COMMIT
+  COMMITTED
+  FAILED
+}
+
+enum DraftReviewStatus {
+  PENDING_REVIEW
+  MATCHED_EXISTING
+  CREATE_NEW
+  RESOLVED
+}
+
+model User {
+  id             String          @id @default(cuid())
+  username       String?
+  phone          String?
+  displayName    String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  products       Product[]
+  orders         Order[]
+  importSessions ImportSession[]
+
+  @@map("users")
+}
+
+model Category {
+  id                     String            @id @default(cuid())
+  code                   String            @unique
+  name                   String
+  sortOrder              Int               @default(0)
+  isActive               Boolean           @default(true)
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+  products               Product[]
+  guessedByDraftItems    ImportItemDraft[] @relation("DraftGuessedCategory")
+  manualForDraftItems    ImportItemDraft[] @relation("DraftManualCategory")
+
+  @@map("categories")
+}
+
+model Tag {
+  id         String       @id @default(cuid())
+  code       String       @unique
+  name       String
+  sortOrder  Int          @default(0)
+  isActive   Boolean      @default(true)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  products   ProductTag[]
+
+  @@map("tags")
+}
+
+model Product {
+  id               String            @id @default(cuid())
+  userId           String
+  categoryId       String
+  displayName      String
+  normalizedName   String
+  specText         String?
+  inventoryStatus  InventoryStatus   @default(UNKNOWN)
+  note             String?
+  primaryImageUrl  String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  lastPurchasedAt  DateTime?
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category         Category          @relation(fields: [categoryId], references: [id])
+  aliases          ProductAlias[]
+  platforms        ProductPlatform[]
+  tags             ProductTag[]
+  orderItems       OrderItem[]
+  selectedInDrafts ImportItemDraft[] @relation("DraftSelectedProduct")
+
+  @@index([userId, displayName])
+  @@index([userId, normalizedName])
+  @@index([userId, categoryId])
+  @@index([lastPurchasedAt])
+  @@map("products")
+}
+
+model ProductAlias {
+  id             String    @id @default(cuid())
+  productId      String
+  platform       Platform
+  rawName        String
+  normalizedName String
+  createdAt      DateTime  @default(now())
+  product        Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, platform, normalizedName])
+  @@index([platform, normalizedName])
+  @@map("product_aliases")
+}
+
+model ProductPlatform {
+  productId   String
+  platform    Platform
+  firstSeenAt DateTime
+  lastSeenAt  DateTime
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([productId, platform])
+  @@index([platform, lastSeenAt])
+  @@map("product_platforms")
+}
+
+model ProductTag {
+  productId  String
+  tagId      String
+  createdAt  DateTime @default(now())
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([productId, tagId])
+  @@map("product_tags")
+}
+
+model Order {
+  id                String         @id @default(cuid())
+  userId            String
+  status            OrderStatus    @default(ACTIVE)
+  platform          Platform
+  orderedAt         DateTime
+  note              String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  images            OrderImage[]
+  items             OrderItem[]
+  preparedByImport  ImportSession? @relation("ImportSessionPreparedOrder")
+  sourceImport      ImportSession? @relation("ImportSessionCommittedOrder")
+
+  @@index([userId, orderedAt])
+  @@index([userId, status, orderedAt])
+  @@index([userId, platform, status, orderedAt])
+  @@map("orders")
+}
+
+model OrderImage {
+  id          String   @id @default(cuid())
+  orderId     String
+  storagePath String
+  pageIndex   Int
+  createdAt   DateTime @default(now())
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, pageIndex])
+  @@map("order_images")
+}
+
+model OrderItem {
+  id                   String    @id @default(cuid())
+  orderId              String
+  productId            String?
+  sourceImportItemDraftId String?
+  rawName              String
+  linePriceAmount      Int
+  currency             Currency  @default(CNY)
+  quantity             Decimal   @db.Decimal(10, 2)
+  specText             String?
+  weightGrams          Int?
+  pricePer100g         Int?
+  resolutionStatus     OrderItemResolutionStatus @default(PENDING)
+  isNewProductAtImport Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  order                Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product              Product?  @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@index([sourceImportItemDraftId])
+  @@index([productId, createdAt])
+  @@map("order_items")
+}
+
+model ImportSession {
+  id               String              @id @default(cuid())
+  userId           String
+  status           ImportSessionStatus @default(DRAFT)
+  platformGuess    Platform?
+  selectedPlatform Platform?
+  orderedAtGuess   DateTime?
+  selectedOrderedAt DateTime?
+  preparedOrderId  String?             @unique
+  preparedOrderBuiltAt DateTime?
+  note             String?
+  rawModelResponse Json?
+  errorMessage     String?
+  committedOrderId String?             @unique
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  images           ImportImage[]
+  itemDrafts       ImportItemDraft[]
+  preparedOrder    Order?              @relation("ImportSessionPreparedOrder", fields: [preparedOrderId], references: [id])
+  committedOrder   Order?              @relation("ImportSessionCommittedOrder", fields: [committedOrderId], references: [id])
+
+  @@index([userId, status, createdAt])
+  @@map("import_sessions")
+}
+
+model ImportImage {
+  id              String        @id @default(cuid())
+  importSessionId String
+  storagePath     String
+  pageIndex       Int
+  createdAt       DateTime      @default(now())
+  importSession   ImportSession @relation(fields: [importSessionId], references: [id], onDelete: Cascade)
+
+  @@unique([importSessionId, pageIndex])
+  @@map("import_images")
+}
+
+model ImportItemDraft {
+  id                 String            @id @default(cuid())
+  importSessionId    String
+  pageIndex          Int?
+  rawName            String
+  normalizedName     String?
+  guessedCategoryId  String?
+  priceAmount        Int?
+  quantity           Decimal?          @db.Decimal(10, 2)
+  specText           String?
+  weightGrams        Int?
+  pricePer100g       Int?
+  candidateProductIds Json?
+  selectedProductId  String?
+  createNewProduct   Boolean           @default(false)
+  manualDisplayName  String?
+  manualCategoryId   String?
+  manualNote         String?
+  reviewStatus       DraftReviewStatus @default(PENDING_REVIEW)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  importSession      ImportSession     @relation(fields: [importSessionId], references: [id], onDelete: Cascade)
+  guessedCategory    Category?         @relation("DraftGuessedCategory", fields: [guessedCategoryId], references: [id])
+  manualCategory     Category?         @relation("DraftManualCategory", fields: [manualCategoryId], references: [id])
+  selectedProduct    Product?          @relation("DraftSelectedProduct", fields: [selectedProductId], references: [id])
+
+  @@index([importSessionId, reviewStatus])
+  @@index([normalizedName])
+  @@map("import_item_drafts")
+}

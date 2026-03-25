@@ -1,0 +1,16 @@
+{
+  "name": "@life-assistant/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --project tsconfig.json"
+  },
+  "dependencies": {
+    "@life-assistant/shared": "workspace:*",
+    "@prisma/client": "^6.0.0"
+  }
+}
