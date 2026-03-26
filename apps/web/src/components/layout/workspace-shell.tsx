@@ -16,14 +16,14 @@ function getPageCopy(pathname: string) {
   if (pathname === "/imports/new") {
     return {
       title: "导入订单",
-      description: "上传订单截图后，系统会自动解析订单内容，确认后即可完成导入。"
+      description: "上传订单截图，系统智能解析订单信息和商品内容。确认后即可完成订单导入。"
     }
   }
 
   if (pathname.startsWith("/imports/")) {
     return {
       title: "导入订单",
-      description: "确认平台、下单时间和商品内容后，一键完成订单导入。"
+      description: "上传订单截图，系统智能解析订单信息和商品内容。确认后即可完成订单导入。"
     }
   }
 
@@ -92,7 +92,16 @@ function getPageCopy(pathname: string) {
 export function WorkspaceShell({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const copy = getPageCopy(pathname)
-  const hideWorkspaceHeader = pathname === "/" || pathname === "/imports/new" || pathname.startsWith("/imports/")
+  const isProductDetailPage = /^\/products\/[^/]+$/.test(pathname)
+  const isProductEditPage = /^\/products\/[^/]+\/edit$/.test(pathname)
+  const hideWorkspaceHeader =
+    pathname === "/" ||
+    pathname === "/imports/new" ||
+    pathname.startsWith("/imports/") ||
+    pathname === "/products" ||
+    pathname === "/orders" ||
+    isProductDetailPage ||
+    isProductEditPage
 
   return (
     <AppShell

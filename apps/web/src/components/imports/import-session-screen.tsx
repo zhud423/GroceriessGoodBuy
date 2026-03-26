@@ -141,7 +141,8 @@ export function ImportSessionScreen({
   const [sessionMessage, setSessionMessage] = useState<string | null>(null)
   const [commitMessage, setCommitMessage] = useState<string | null>(null)
   const [hasRequestedAutoAnalyze, setHasRequestedAutoAnalyze] = useState(false)
-  const [isPreparingCommit, setIsPreparingCommit] = useState(false)
+  const [isSubmittingCommit, setIsSubmittingCommit] = useState(false)
+  const [isImageSectionCollapsed, setIsImageSectionCollapsed] = useState(false)
 
   const importSessionQuery = useAuthedQuery<ImportSessionDetailDto>({
     queryKey: ["import-session", importSessionId],
@@ -152,7 +153,6 @@ export function ImportSessionScreen({
     refetchInterval: (query) =>
       query.state.data &&
       (query.state.data.isAnalyzing ||
-        query.state.data.isPreparingCommit ||
         query.state.data.status === "PROCESSING")
         ? 3000
         : false
@@ -209,12 +209,8 @@ export function ImportSessionScreen({
           forceReanalyze: body && "forceReanalyze" in body ? body.forceReanalyze : undefined
         }
       }),
-    onSuccess: (data) => {
-      setSessionMessage(
-        data.status === "PROCESSING"
-          ? "解析已开始，后台正在整理订单信息和商品内容。"
-          : "解析已完成，请确认订单内容。"
-      )
+    onSuccess: () => {
+      setSessionMessage(null)
       void queryClient.invalidateQueries({ queryKey: ["import-session", importSessionId] })
     },
     onError: (error) => {
@@ -232,7 +228,7 @@ export function ImportSessionScreen({
         accessToken,
         body
       }),
-    onSuccess: (data) => {
+    onSuccess: () => {
       void Promise.all([
         queryClient.invalidateQueries({ queryKey: ["import-session", importSessionId] }),
         queryClient.invalidateQueries({ queryKey: ["orders"] }),
@@ -240,7 +236,7 @@ export function ImportSessionScreen({
         queryClient.invalidateQueries({ queryKey: ["dashboard"] })
       ])
 
-      router.replace(`/orders/${data.orderId}`)
+      router.replace("/")
     },
     onError: (error) => {
       const fieldErrors = Object.values(getFormFieldErrors(error))
@@ -269,7 +265,7 @@ export function ImportSessionScreen({
     }
 
     setHasRequestedAutoAnalyze(true)
-    setSessionMessage("截图已上传，正在解析订单内容。没有视觉模型时会自动回退到手动确认模式。")
+    setSessionMessage(null)
     reanalyzeMutation.mutate({ forceReanalyze: false })
   }, [
     hasRequestedAutoAnalyze,
@@ -283,17 +279,9 @@ export function ImportSessionScreen({
         <section className="rounded-[32px] border border-[color:var(--line)] bg-[color:var(--surface)] p-6 shadow-[0_24px_80px_rgba(108,91,69,0.08)]">
           <h3 className="font-display text-3xl text-[color:var(--foreground)]">导入订单</h3>
           <p className="mt-2 max-w-2xl text-sm leading-7 text-[color:var(--muted)]">
-            当前版本会先创建导入会话、上传截图，并在上传完成后立刻启动后台分析。填好火山方舟的
-            ARK_API_KEY 和 ARK_VISION_MODEL 后会走多模态识别；没配齐时会自动回退到手动确认模式，不会阻塞你继续导入。
+            上传订单截图，系统智能解析订单信息和商品内容。确认后即可完成订单导入。
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
-            <button
-              type="button"
-              disabled
-              className="rounded-2xl border border-[color:var(--line)] bg-white/75 px-4 py-3 text-sm font-semibold text-[color:var(--foreground)] opacity-60"
-            >
-              截图分析中
-            </button>
             <button
               type="button"
               disabled
@@ -303,31 +291,46 @@ export function ImportSessionScreen({
             </button>
           </div>
           <div className="mt-4 rounded-[24px] border border-[color:var(--line)] bg-white/80 px-4 py-3 text-sm text-[color:var(--muted)]">
-            当前阶段：截图分析中
+            截图 AI 分析中，请等待 90s 再查看
           </div>
         </section>
 
         {localImagePreviewUrls.length > 0 ? (
           <section className="rounded-[32px] border border-[color:var(--line)] bg-white/75 p-6 shadow-[0_24px_80px_rgba(108,91,69,0.08)]">
-            <h4 className="font-display text-2xl text-[color:var(--foreground)]">当前截图</h4>
-            <div className="mt-4 space-y-3">
-              {localImagePreviewUrls.map((imageUrl, index) => (
-                <div
-                  key={`${imageUrl}-${index}`}
-                  className="rounded-[24px] border border-[color:var(--line)] bg-white/80 p-4"
-                >
-                  <div className="mb-3 text-sm font-semibold text-[color:var(--foreground)]">
-                    第 {index + 1} 页
-                  </div>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    alt={`导入截图 ${index + 1}`}
-                    src={imageUrl}
-                    className="w-full rounded-2xl border border-[color:var(--line)] object-cover"
-                  />
-                </div>
-              ))}
+            <div className="flex items-center justify-between gap-3">
+              <h4 className="font-display text-2xl text-[color:var(--foreground)]">当前截图</h4>
+              <button
+                type="button"
+                onClick={() => setIsImageSectionCollapsed((current) => !current)}
+                className="rounded-2xl border border-[color:var(--line)] bg-white/80 px-4 py-2 text-sm font-semibold text-[color:var(--foreground)] transition hover:bg-white"
+              >
+                {isImageSectionCollapsed ? "展开截图" : "隐藏截图"}
+              </button>
             </div>
+            {isImageSectionCollapsed ? (
+              <div className="mt-4 rounded-[24px] border border-[color:var(--line)] bg-white/80 px-4 py-3 text-sm text-[color:var(--muted)]">
+                截图已隐藏，共 {localImagePreviewUrls.length} 张。
+              </div>
+            ) : (
+              <div className="mt-4 space-y-3">
+                {localImagePreviewUrls.map((imageUrl, index) => (
+                  <div
+                    key={`${imageUrl}-${index}`}
+                    className="rounded-[24px] border border-[color:var(--line)] bg-white/80 p-4"
+                  >
+                    <div className="mb-3 text-sm font-semibold text-[color:var(--foreground)]">
+                      第 {index + 1} 页
+                    </div>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      alt={`导入截图 ${index + 1}`}
+                      src={imageUrl}
+                      className="w-full rounded-2xl border border-[color:var(--line)] object-cover"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
         ) : null}
       </div>
@@ -349,23 +352,22 @@ export function ImportSessionScreen({
 
   const session = importSessionQuery.data
   const imagePreviewItems =
-    session.images.length > 0
-      ? session.images.map((image) => ({
-          key: image.id,
-          pageIndex: image.pageIndex,
-          imageUrl: image.imageUrl
-        }))
-      : localImagePreviewUrls.map((imageUrl, index) => ({
+    localImagePreviewUrls.length > 0
+      ? localImagePreviewUrls.map((imageUrl, index) => ({
           key: `local-${index}`,
           pageIndex: index,
           imageUrl
         }))
+      : session.images.map((image) => ({
+          key: image.id,
+          pageIndex: image.pageIndex,
+          imageUrl: image.imageUrl
+        }))
   const showParsedOrderSection =
     session.committedOrderId != null ||
-    session.status === "READY_TO_COMMIT" ||
+    session.status === "ANALYZED" ||
     session.status === "COMMITTED" ||
     session.status === "FAILED" ||
-    session.isPreparingCommit ||
     session.itemDrafts.length > 0
   const loadingError = platformsQuery.error ?? categoriesQuery.error
   const platforms = platformsQuery.data ?? []
@@ -407,52 +409,41 @@ export function ImportSessionScreen({
     ...(showParsedOrderSection && (reanalyzeMutation.isPending || session.isAnalyzing)
       ? ["订单解析尚未完成，请稍等"]
       : []),
-    ...(session.isPreparingCommit ? ["系统正在准备可导入订单，请稍等"] : []),
     ...(selectedPlatform ? [] : ["请选择并保存订单平台"]),
     ...(selectedOrderedAt ? [] : ["请选择并保存下单时间"]),
     ...(missingCoreDraftCount > 0
       ? [`还有 ${missingCoreDraftCount} 个商品项未补齐价格或数量`]
       : [])
   ]
-  const willAutoSaveBeforeCommit = hasUnsavedSessionChanges || hasUnsavedDraftChanges
   const canCommit =
     session.status !== "COMMITTED" &&
-    !isPreparingCommit &&
+    !isSubmittingCommit &&
     !confirmMutation.isPending &&
     hardCommitBlockers.length === 0
-  const commitButtonLabel =
-    !showParsedOrderSection
+  const isConfirmingOrder = isSubmittingCommit || confirmMutation.isPending
+  const confirmingOrderMessage = "订单及其包含的商品正在导入中，预计耗时 3s"
+  const isAiAnalyzingStage =
+    !showParsedOrderSection ||
+    session.isAnalyzing ||
+    reanalyzeMutation.isPending
+  const commitButtonLabel = isConfirmingOrder
+    ? confirmingOrderMessage
+    : isAiAnalyzingStage
       ? "截图分析中"
-      : isPreparingCommit || confirmMutation.isPending
-      ? "订单导入中"
-      : session.isAnalyzing
-        ? "正在解析订单..."
-        : session.isPreparingCommit
-          ? "订单导入中"
-          : canCommit
-            ? "确认订单"
-            : "先补齐订单信息"
-  const orderStatusSummary = session.isAnalyzing
-    ? "正在解析订单"
-    : session.isPreparingCommit
-      ? "订单导入中"
-      : session.status === "READY_TO_COMMIT"
-        ? "待确认"
-        : "还需补齐订单信息"
-  const topActionSecondaryLabel = !showParsedOrderSection
-    ? "截图分析中"
-    : reanalyzeMutation.isPending
-      ? "重跑中..."
-      : "重新分析"
-  const topActionStageLabel = !showParsedOrderSection
-    ? "截图分析中"
-    : isPreparingCommit || confirmMutation.isPending || session.isPreparingCommit
-      ? "订单导入中"
-      : session.status === "COMMITTED"
-        ? "订单导入完成"
-        : canCommit
-          ? "待确认导入"
-          : "待补齐订单信息"
+      : canCommit
+        ? "确认订单"
+        : "先补齐订单信息"
+  const shouldShowReanalyzeAction =
+    !isAiAnalyzingStage && !isConfirmingOrder && session.status !== "COMMITTED"
+  const topActionStageLabel = isConfirmingOrder
+    ? confirmingOrderMessage
+    : isAiAnalyzingStage
+    ? "截图 AI 分析中，请等待 90s 再查看"
+    : session.status === "COMMITTED"
+      ? "订单导入完成"
+      : canCommit
+        ? "请确认识别的订单信息准确性，不准确可修改，无问题可一键确认"
+        : "待补齐订单信息"
 
   function updateDraftForm(
     draftId: string,
@@ -490,7 +481,7 @@ export function ImportSessionScreen({
       return
     }
 
-    setIsPreparingCommit(true)
+    setIsSubmittingCommit(true)
 
     try {
       const draftUpdates = getChangedDraftPayload()
@@ -513,7 +504,7 @@ export function ImportSessionScreen({
         setCommitMessage(getFormErrorMessage(error))
       }
     } finally {
-      setIsPreparingCommit(false)
+      setIsSubmittingCommit(false)
     }
   }
 
@@ -522,18 +513,18 @@ export function ImportSessionScreen({
       <section className="rounded-[32px] border border-[color:var(--line)] bg-[color:var(--surface)] p-6 shadow-[0_24px_80px_rgba(108,91,69,0.08)]">
         <h3 className="font-display text-3xl text-[color:var(--foreground)]">导入订单</h3>
         <p className="mt-2 max-w-3xl text-sm leading-7 text-[color:var(--muted)]">
-          当前版本会先创建导入会话、上传截图，并在上传完成后立刻启动后台分析。填好火山方舟的
-          ARK_API_KEY 和 ARK_VISION_MODEL 后会走多模态识别；没配齐时会自动回退到手动确认模式，不会阻塞你继续导入。
+          上传订单截图，系统智能解析订单信息和商品内容。确认后即可完成订单导入。
         </p>
         <div className="mt-4 flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={() => reanalyzeMutation.mutate({ forceReanalyze: true })}
-            disabled={!showParsedOrderSection || reanalyzeMutation.isPending || session.status === "COMMITTED"}
-            className="rounded-2xl border border-[color:var(--line)] bg-white/75 px-4 py-3 text-sm font-semibold text-[color:var(--foreground)] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {topActionSecondaryLabel}
-          </button>
+          {shouldShowReanalyzeAction ? (
+            <button
+              type="button"
+              onClick={() => reanalyzeMutation.mutate({ forceReanalyze: true })}
+              className="rounded-2xl border border-[color:var(--line)] bg-white/75 px-4 py-3 text-sm font-semibold text-[color:var(--foreground)] transition hover:bg-white"
+            >
+              重新分析
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={handleCommit}
@@ -544,13 +535,45 @@ export function ImportSessionScreen({
           </button>
         </div>
         <div className="mt-4 rounded-[24px] border border-[color:var(--line)] bg-white/80 px-4 py-3 text-sm text-[color:var(--muted)]">
-          当前阶段：{topActionStageLabel}
+          {topActionStageLabel}
         </div>
+        {showParsedOrderSection ? (
+          <div className="mt-4 rounded-[24px] border border-[color:var(--line)] bg-white/80 px-4 py-3 text-sm leading-7 text-[color:var(--muted)]">
+            <div>- 已识别商品项：{session.itemDrafts.length} 项</div>
+            <div>- 未识别商品项：{unresolvedDraftCount} 项</div>
+          </div>
+        ) : null}
+        {commitMessage ? (
+          <div className="mt-4 rounded-[24px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            {commitMessage}
+          </div>
+        ) : null}
+        {session.committedOrderId ? (
+          <Link
+            href={`/orders/${session.committedOrderId}`}
+            className="mt-4 inline-flex text-sm font-semibold text-[color:var(--accent-strong)]"
+          >
+            查看已导入订单 →
+          </Link>
+        ) : null}
       </section>
 
       <section className="rounded-[32px] border border-[color:var(--line)] bg-white/75 p-6 shadow-[0_24px_80px_rgba(108,91,69,0.08)]">
-        <h4 className="font-display text-2xl text-[color:var(--foreground)]">当前截图</h4>
-        {imagePreviewItems.length > 0 ? (
+        <div className="flex items-center justify-between gap-3">
+          <h4 className="font-display text-2xl text-[color:var(--foreground)]">当前截图</h4>
+          <button
+            type="button"
+            onClick={() => setIsImageSectionCollapsed((current) => !current)}
+            className="rounded-2xl border border-[color:var(--line)] bg-white/80 px-4 py-2 text-sm font-semibold text-[color:var(--foreground)] transition hover:bg-white"
+          >
+            {isImageSectionCollapsed ? "展开截图" : "隐藏截图"}
+          </button>
+        </div>
+        {isImageSectionCollapsed ? (
+          <div className="mt-4 rounded-[24px] border border-[color:var(--line)] bg-white/80 px-4 py-3 text-sm text-[color:var(--muted)]">
+            截图已隐藏，共 {imagePreviewItems.length} 张。
+          </div>
+        ) : imagePreviewItems.length > 0 ? (
           <div className="mt-4 space-y-3">
             {imagePreviewItems.map((image) => (
               <div
@@ -649,11 +672,6 @@ export function ImportSessionScreen({
             {loadingError ? (
               <div className="mt-4 rounded-[24px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
                 平台或分类加载失败：{loadingError instanceof Error ? loadingError.message : "请稍后刷新重试。"}
-              </div>
-            ) : null}
-            {session.isPreparingCommit ? (
-              <div className="mt-4 rounded-[24px] border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
-                订单解析已经完成，系统正在后台准备导入。你可以继续调整订单信息和商品内容。
               </div>
             ) : null}
             {session.itemDrafts.length > 0 && unresolvedDraftCount > 0 ? (
@@ -913,36 +931,6 @@ export function ImportSessionScreen({
             </div>
           </section>
         </>
-      ) : null}
-
-      {showParsedOrderSection ? (
-        <section className="rounded-[32px] border border-[color:var(--line)] bg-white/75 p-6 shadow-[0_24px_80px_rgba(108,91,69,0.08)]">
-          <h4 className="font-display text-2xl text-[color:var(--foreground)]">确认摘要</h4>
-          <div className="mt-4 space-y-2 text-sm leading-7 text-[color:var(--muted)]">
-            <div>- 平台已确认：{selectedPlatform ? "是" : "否"}</div>
-            <div>- 下单时间已确认：{selectedOrderedAt ? "是" : "否"}</div>
-            <div>- 订单状态：{orderStatusSummary}</div>
-            <div>- 已识别商品项：{session.itemDrafts.length} 项</div>
-            <div>- 未决定商品归档：{unresolvedDraftCount} 项</div>
-            <div>- 有待导入前修改：{willAutoSaveBeforeCommit ? "是，确认时会自动保存" : "否"}</div>
-            {hardCommitBlockers.length > 0 ? (
-              <div className="pt-2 text-rose-600">- 当前阻塞：{hardCommitBlockers.join("；")}</div>
-            ) : null}
-          </div>
-          {commitMessage ? (
-            <div className="mt-4 rounded-[24px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-              {commitMessage}
-            </div>
-          ) : null}
-          {session.committedOrderId ? (
-            <Link
-              href={`/orders/${session.committedOrderId}`}
-              className="mt-4 inline-flex text-sm font-semibold text-[color:var(--accent-strong)]"
-            >
-              查看已导入订单 →
-            </Link>
-          ) : null}
-        </section>
       ) : null}
 
       {session.committedOrderId ? (

@@ -439,7 +439,17 @@ class OpenAICompatibleVisionProvider implements VisionProvider {
   }
 }
 
+let cachedProvider: VisionProvider | null = null
+
 function getConfiguredProvider() {
+  if (!cachedProvider) {
+    cachedProvider = buildConfiguredProvider()
+  }
+
+  return cachedProvider
+}
+
+function buildConfiguredProvider() {
   const provider = process.env.LLM_PROVIDER?.trim().toLowerCase()
 
   if (provider === "ark") {

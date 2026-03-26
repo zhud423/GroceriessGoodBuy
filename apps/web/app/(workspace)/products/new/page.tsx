@@ -1,5 +1,5 @@
-import { ProductEditorScreen } from "@/src/components/products/product-editor-screen"
+import { redirect } from "next/navigation"
 
 export default function NewProductPage() {
-  return <ProductEditorScreen mode="create" />
+  redirect("/products")
 }

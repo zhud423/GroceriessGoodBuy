@@ -100,11 +100,22 @@ export function getTestLoginAccounts() {
 
 export function findTestLoginAccount(username: string, password: string) {
   const normalizedUsername = normalizeUsername(username)
+  const passwordBuffer = Buffer.from(password)
 
   return (
     getTestLoginAccounts().find(
-      (account) =>
-        account.username === normalizedUsername && account.password === password
+      (account) => {
+        if (account.username !== normalizedUsername) {
+          return false
+        }
+
+        const accountPasswordBuffer = Buffer.from(account.password)
+
+        return (
+          accountPasswordBuffer.length === passwordBuffer.length &&
+          timingSafeEqual(accountPasswordBuffer, passwordBuffer)
+        )
+      }
     ) || null
   )
 }

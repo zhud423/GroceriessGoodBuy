@@ -1,4 +1,9 @@
-import type { CreateProductRequest, ProductsListQuery, UpdateProductRequest } from "@life-assistant/contracts"
+import type {
+  BulkUpdateProductTagsRequest,
+  CreateProductRequest,
+  ProductsListQuery,
+  UpdateProductRequest
+} from "@life-assistant/contracts"
 import { prisma, type Prisma } from "@life-assistant/db"
 import { normalizeProductName } from "@life-assistant/domain"
 import { getPlatformLabel, toPlatformOption, type PlatformCode } from "@life-assistant/shared"
@@ -9,7 +14,7 @@ import {
   ensureActiveTagIds,
   normalizeOptionalText
 } from "../catalog"
-import { RouteError } from "../route-error"
+import { RouteError, createValidationError } from "../route-error"
 
 function mapProductTags(
   productTags: Array<{
@@ -428,6 +433,64 @@ export async function updateProductForUser(
 
     return {
       productId
+    }
+  })
+}
+
+export async function bulkUpdateProductTagsForUser(
+  userId: string,
+  input: BulkUpdateProductTagsRequest
+) {
+  return prisma.$transaction(async (tx) => {
+    const productIds = dedupeStrings(input.productIds)
+    const products = await tx.product.findMany({
+      where: {
+        userId,
+        id: {
+          in: productIds
+        }
+      },
+      select: {
+        id: true
+      }
+    })
+
+    if (products.length !== productIds.length) {
+      throw createValidationError("Request validation failed.", {
+        productIds: "Some products do not exist or are not owned by current user."
+      })
+    }
+
+    const tagIds = await ensureActiveTagIds(tx, [input.tagId])
+    const [tagId] = tagIds
+
+    if (!tagId) {
+      throw createValidationError("Request validation failed.", {
+        tagId: "Tag does not exist or is inactive."
+      })
+    }
+
+    if (input.action === "add") {
+      await tx.productTag.createMany({
+        data: productIds.map((productId) => ({
+          productId,
+          tagId
+        })),
+        skipDuplicates: true
+      })
+    } else {
+      await tx.productTag.deleteMany({
+        where: {
+          productId: {
+            in: productIds
+          },
+          tagId
+        }
+      })
+    }
+
+    return {
+      updatedCount: productIds.length
     }
   })
 }

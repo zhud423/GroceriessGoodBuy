@@ -4,7 +4,7 @@ import type {
   CommitImportSessionRequest,
   CreateImportSessionRequest,
   DraftReviewStatus,
-  ImportSessionStatus,
+  ImportSessionStatus as PublicImportSessionStatus,
   UpdateImportItemDraftRequest,
   UpdateImportItemDraftsRequest,
   UpdateImportSessionRequest
@@ -12,10 +12,12 @@ import type {
 import { prisma, Prisma, type Platform } from "@life-assistant/db"
 import { calculatePricePer100g, normalizeProductName } from "@life-assistant/domain"
 import { getPlatformLabel, toPlatformOption, type PlatformCode } from "@life-assistant/shared"
+import type { ImportSessionStatus as DbImportSessionStatus } from "@prisma/client"
 import { randomUUID } from "node:crypto"
 
 import { isBackgroundTaskRunning, startBackgroundTask } from "../background-tasks"
 import { ensureActiveCategory, normalizeOptionalText } from "../catalog"
+import { ensureOwnedProduct, upsertProductAlias, refreshProductOrderAggregates } from "../products/helpers"
 import {
   copyImportImageToOrderStorage,
   deleteOrderImagesFromStorage,
@@ -96,6 +98,14 @@ function getPrepareOrderTaskKey(sessionId: string) {
 
 function getPrepareOrderCleanupTaskKey(orderId: string) {
   return `${IMPORT_PREPARE_ORDER_TASK_PREFIX}:cleanup:${orderId}`
+}
+
+function toPublicImportSessionStatus(status: DbImportSessionStatus): PublicImportSessionStatus {
+  if (status === "REVIEW_REQUIRED" || status === "READY_TO_COMMIT") {
+    return "ANALYZED"
+  }
+
+  return status
 }
 
 function scheduleQueuedImportTask(taskKey: string, runner: () => Promise<void>) {
@@ -378,31 +388,6 @@ async function applyImportDraftUpdate(
   })
 }
 
-async function ensureOwnedProduct(
-  tx: TransactionClient,
-  userId: string,
-  productId: string,
-  fieldPath: string
-) {
-  const product = await tx.product.findFirst({
-    where: {
-      id: productId,
-      userId
-    },
-    select: {
-      id: true
-    }
-  })
-
-  if (!product) {
-    throw createValidationError("Request validation failed.", {
-      [fieldPath]: "Referenced product does not exist."
-    })
-  }
-
-  return product
-}
-
 async function createProductInsideImportCommit(
   tx: TransactionClient,
   userId: string,
@@ -428,167 +413,6 @@ async function createProductInsideImportCommit(
     },
     select: {
       id: true
-    }
-  })
-}
-
-async function upsertProductAlias(
-  client: DatabaseClient,
-  productId: string,
-  platform: Platform,
-  rawName: string
-) {
-  const normalizedName = normalizeProductName(rawName)
-
-  if (!normalizedName) {
-    return
-  }
-
-  await client.productAlias.upsert({
-    where: {
-      productId_platform_normalizedName: {
-        productId,
-        platform,
-        normalizedName
-      }
-    },
-    update: {
-      rawName: rawName.trim()
-    },
-    create: {
-      productId,
-      platform,
-      rawName: rawName.trim(),
-      normalizedName
-    }
-  })
-}
-
-async function refreshProductOrderAggregates(
-  client: DatabaseClient,
-  userId: string,
-  productId: string,
-  platform: Platform
-) {
-  const latestOrderItem = await client.orderItem.findFirst({
-    where: {
-      productId,
-      order: {
-        userId,
-        status: "ACTIVE"
-      }
-    },
-    select: {
-      order: {
-        select: {
-          orderedAt: true
-        }
-      }
-    },
-    orderBy: [
-      {
-        order: {
-          orderedAt: "desc"
-        }
-      },
-      {
-        createdAt: "desc"
-      }
-    ]
-  })
-
-  await client.product.update({
-    where: {
-      id: productId
-    },
-    data: {
-      lastPurchasedAt: latestOrderItem?.order.orderedAt ?? null
-    }
-  })
-
-  const earliestPlatformItem = await client.orderItem.findFirst({
-    where: {
-      productId,
-      order: {
-        userId,
-        platform,
-        status: "ACTIVE"
-      }
-    },
-    select: {
-      order: {
-        select: {
-          orderedAt: true
-        }
-      }
-    },
-    orderBy: [
-      {
-        order: {
-          orderedAt: "asc"
-        }
-      },
-      {
-        createdAt: "asc"
-      }
-    ]
-  })
-
-  const latestPlatformItem = await client.orderItem.findFirst({
-    where: {
-      productId,
-      order: {
-        userId,
-        platform,
-        status: "ACTIVE"
-      }
-    },
-    select: {
-      order: {
-        select: {
-          orderedAt: true
-        }
-      }
-    },
-    orderBy: [
-      {
-        order: {
-          orderedAt: "desc"
-        }
-      },
-      {
-        createdAt: "desc"
-      }
-    ]
-  })
-
-  if (!earliestPlatformItem || !latestPlatformItem) {
-    await client.productPlatform.deleteMany({
-      where: {
-        productId,
-        platform
-      }
-    })
-
-    return
-  }
-
-  await client.productPlatform.upsert({
-    where: {
-      productId_platform: {
-        productId,
-        platform
-      }
-    },
-    update: {
-      firstSeenAt: earliestPlatformItem.order.orderedAt,
-      lastSeenAt: latestPlatformItem.order.orderedAt
-    },
-    create: {
-      productId,
-      platform,
-      firstSeenAt: earliestPlatformItem.order.orderedAt,
-      lastSeenAt: latestPlatformItem.order.orderedAt
     }
   })
 }
@@ -1038,7 +862,7 @@ async function findCandidateMatchesForItems(
 async function recomputeImportSessionStatus(
   tx: TransactionClient,
   sessionId: string
-): Promise<ImportSessionStatus> {
+): Promise<DbImportSessionStatus> {
   const session = await tx.importSession.findUnique({
     where: {
       id: sessionId
@@ -1072,7 +896,7 @@ async function recomputeImportSessionStatus(
     return "COMMITTED"
   }
 
-  let nextStatus: ImportSessionStatus = "DRAFT"
+  let nextStatus: DbImportSessionStatus = "DRAFT"
 
   if (session.itemDrafts.length > 0) {
     const allDraftsReady = session.itemDrafts.every((draft) =>
@@ -1283,7 +1107,7 @@ export async function uploadImportImagesForUser(
 
 type UploadImportImagesResult = {
   importSessionId: string
-  status: ImportSessionStatus
+  status: PublicImportSessionStatus
   uploaded: Array<{
     imageId: string
     pageIndex: number
@@ -1369,7 +1193,7 @@ export async function getImportSessionDetailForUser(userId: string, sessionId: s
 
   return {
     id: session.id,
-    status: session.status,
+    status: toPublicImportSessionStatus(session.status),
     isAnalyzing: isBackgroundTaskRunning(getAnalyzeTaskKey(session.id)),
     isPreparingCommit: isBackgroundTaskRunning(getPrepareOrderTaskKey(session.id)),
     errorMessage: session.errorMessage,
@@ -1886,7 +1710,7 @@ export async function analyzeImportSessionForUser(
   if (session.itemDrafts.length > 0 && !input.forceReanalyze) {
     return {
       importSessionId: sessionId,
-      status: session.status
+      status: toPublicImportSessionStatus(session.status)
     }
   }
 
@@ -2158,26 +1982,28 @@ export async function commitImportSessionForUser(
   sessionId: string,
   input: CommitImportSessionRequest
 ) {
-  const session = await prisma.importSession.findFirst({
-    where: {
-      id: sessionId,
-      userId
-    },
-    select: {
-      id: true,
-      status: true,
-      note: true,
-      preparedOrderId: true,
-      preparedOrderBuiltAt: true,
-      selectedPlatform: true,
-      selectedOrderedAt: true,
-      _count: {
-        select: {
-          itemDrafts: true
+  const loadSessionForCommit = () =>
+    prisma.importSession.findFirst({
+      where: {
+        id: sessionId,
+        userId
+      },
+      select: {
+        id: true,
+        status: true,
+        note: true,
+        preparedOrderId: true,
+        preparedOrderBuiltAt: true,
+        selectedPlatform: true,
+        selectedOrderedAt: true,
+        _count: {
+          select: {
+            itemDrafts: true
+          }
         }
       }
-    }
-  })
+    })
+  let session = await loadSessionForCommit()
 
   if (!session) {
     throw new RouteError("NOT_FOUND", "Import session not found.", 404)
@@ -2205,8 +2031,12 @@ export async function commitImportSessionForUser(
     fieldErrors.itemDrafts = "At least one imported item is required."
   }
 
-  if (session.status !== "READY_TO_COMMIT") {
-    fieldErrors.status = "AI is still preparing the order. Please wait for analysis to finish."
+  if (session.status === "DRAFT" || session.status === "PROCESSING") {
+    fieldErrors.status = "AI is still analyzing screenshots. Please wait and try again."
+  }
+
+  if (session.status === "FAILED") {
+    fieldErrors.status = "Current import session failed. Please reanalyze screenshots first."
   }
 
   if (Object.keys(fieldErrors).length > 0) {
@@ -2219,10 +2049,22 @@ export async function commitImportSessionForUser(
   }
 
   if (!session.preparedOrderId || !session.preparedOrderBuiltAt) {
+    await syncPreparedOrderForImportSession(userId, sessionId)
+    session = await loadSessionForCommit()
+  }
+
+  if (!session) {
+    throw new RouteError("NOT_FOUND", "Import session not found.", 404)
+  }
+
+  if (!session.preparedOrderId || !session.preparedOrderBuiltAt) {
     throw new RouteError(
-      "CONFLICT",
-      "Prepared order is not ready yet. Refresh the import session and try again.",
-      409
+      "IMPORT_NOT_READY",
+      "Import session is not ready to commit.",
+      409,
+      {
+        status: "Order fields are still incomplete. Please complete required fields and retry."
+      }
     )
   }
 
@@ -2257,7 +2099,7 @@ export async function commitImportSessionForUser(
         "id" = ${sessionId}
         AND "userId" = ${userId}
         AND "preparedOrderId" = ${preparedOrderId}
-        AND "status" = CAST('READY_TO_COMMIT' AS "ImportSessionStatus")
+        AND "status" <> CAST('COMMITTED' AS "ImportSessionStatus")
       RETURNING "id"
     )
     SELECT
@@ -2406,8 +2248,6 @@ export async function confirmImportSessionForUser(
       maxWait: IMPORT_TRANSACTION_MAX_WAIT_MS,
       timeout: IMPORT_TRANSACTION_TIMEOUT_MS
     })
-
-    await syncPreparedOrderForImportSession(userId, sessionId)
   }
 
   return commitImportSessionForUser(userId, sessionId, {

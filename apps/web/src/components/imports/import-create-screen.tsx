@@ -98,8 +98,7 @@ export function ImportCreateScreen({
               导入订单
             </h3>
             <p className="mt-2 max-w-2xl text-sm leading-7 text-[color:var(--muted)]">
-              当前版本会先创建导入会话、上传截图，并在上传完成后立刻启动后台分析。填好火山方舟的
-              ARK_API_KEY 和 ARK_VISION_MODEL 后会走多模态识别；没配齐时会自动回退到手动确认模式，不会阻塞你继续导入。
+              上传订单截图，系统智能解析订单信息和商品内容。确认后即可完成订单导入。
             </p>
           </div>
           <div className="w-full max-w-xl space-y-3">

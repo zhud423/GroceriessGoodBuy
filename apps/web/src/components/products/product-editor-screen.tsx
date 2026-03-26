@@ -4,7 +4,6 @@ import type {
   CategoryDto,
   CreateProductRequest,
   MutateProductResponse,
-  PlatformDto,
   ProductDetailDto,
   TagDto,
   UpdateProductRequest
@@ -115,14 +114,6 @@ export function ProductEditorScreen(props: ProductEditorScreenProps) {
       })
   })
 
-  const platformsQuery = useAuthedQuery<PlatformDto[]>({
-    queryKey: ["platforms"],
-    queryFn: (accessToken) =>
-      apiFetch("/api/platforms", {
-        accessToken
-      })
-  })
-
   const productQuery = useAuthedQuery<ProductDetailDto>({
     queryKey: ["product-detail", productId],
     enabled: Boolean(productId),
@@ -183,9 +174,9 @@ export function ProductEditorScreen(props: ProductEditorScreenProps) {
     }
   })
 
-  const dictionariesError = categoriesQuery.error ?? tagsQuery.error ?? platformsQuery.error
+  const dictionariesError = categoriesQuery.error ?? tagsQuery.error
   const isLoadingDictionaries =
-    categoriesQuery.isLoading || tagsQuery.isLoading || platformsQuery.isLoading
+    categoriesQuery.isLoading || tagsQuery.isLoading
 
   if (isLoadingDictionaries || (props.mode === "edit" && productQuery.isLoading)) {
     return (
@@ -259,224 +250,145 @@ export function ProductEditorScreen(props: ProductEditorScreenProps) {
         </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className="space-y-4">
-          <div className="rounded-[32px] border border-[color:var(--line)] bg-[color:var(--surface)] p-6 shadow-[0_24px_80px_rgba(108,91,69,0.08)]">
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="space-y-2 md:col-span-2">
-                <span className="text-sm font-semibold text-[color:var(--foreground)]">
-                  商品名称
-                </span>
-                <input
-                  value={form.displayName}
-                  onChange={(event) =>
-                    setForm((current) => ({ ...current, displayName: event.target.value }))
-                  }
-                  placeholder="例如：有机贝贝南瓜"
-                  className={inputClassName}
-                />
-                {fieldErrors.displayName ? (
-                  <div className="text-xs text-red-600">{fieldErrors.displayName}</div>
-                ) : null}
-              </label>
+      <section className="space-y-4">
+        <div className="rounded-[32px] border border-[color:var(--line)] bg-[color:var(--surface)] p-6 shadow-[0_24px_80px_rgba(108,91,69,0.08)]">
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="space-y-2 md:col-span-2">
+              <span className="text-sm font-semibold text-[color:var(--foreground)]">
+                商品名称
+              </span>
+              <input
+                value={form.displayName}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, displayName: event.target.value }))
+                }
+                placeholder="例如：有机贝贝南瓜"
+                className={inputClassName}
+              />
+              {fieldErrors.displayName ? (
+                <div className="text-xs text-red-600">{fieldErrors.displayName}</div>
+              ) : null}
+            </label>
 
-              <label className="space-y-2">
-                <span className="text-sm font-semibold text-[color:var(--foreground)]">
-                  分类
-                </span>
-                <select
-                  value={form.categoryId}
-                  onChange={(event) =>
-                    setForm((current) => ({ ...current, categoryId: event.target.value }))
-                  }
-                  className={inputClassName}
-                >
-                  <option value="">请选择分类</option>
-                  {categoriesQuery.data?.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-                {fieldErrors.categoryId ? (
-                  <div className="text-xs text-red-600">{fieldErrors.categoryId}</div>
-                ) : null}
-              </label>
+            <label className="space-y-2">
+              <span className="text-sm font-semibold text-[color:var(--foreground)]">
+                分类
+              </span>
+              <select
+                value={form.categoryId}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, categoryId: event.target.value }))
+                }
+                className={inputClassName}
+              >
+                <option value="">请选择分类</option>
+                {categoriesQuery.data?.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+              {fieldErrors.categoryId ? (
+                <div className="text-xs text-red-600">{fieldErrors.categoryId}</div>
+              ) : null}
+            </label>
 
-              <label className="space-y-2">
-                <span className="text-sm font-semibold text-[color:var(--foreground)]">
-                  库存状态
-                </span>
-                <select
-                  value={form.inventoryStatus}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      inventoryStatus: event.target.value as ProductFormState["inventoryStatus"]
-                    }))
-                  }
-                  className={inputClassName}
-                >
-                  {inventoryOptions.map((item) => (
-                    <option key={item.value} value={item.value}>
-                      {item.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+            <label className="space-y-2">
+              <span className="text-sm font-semibold text-[color:var(--foreground)]">
+                库存状态
+              </span>
+              <select
+                value={form.inventoryStatus}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    inventoryStatus: event.target.value as ProductFormState["inventoryStatus"]
+                  }))
+                }
+                className={inputClassName}
+              >
+                {inventoryOptions.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-              <label className="space-y-2 md:col-span-2">
-                <span className="text-sm font-semibold text-[color:var(--foreground)]">
-                  规格
-                </span>
-                <input
-                  value={form.specText}
-                  onChange={(event) =>
-                    setForm((current) => ({ ...current, specText: event.target.value }))
-                  }
-                  placeholder="例如：1kg / 6 个装"
-                  className={inputClassName}
-                />
-              </label>
-            </div>
-          </div>
-
-          <div className="rounded-[32px] border border-[color:var(--line)] bg-[color:var(--surface)] p-6 shadow-[0_24px_80px_rgba(108,91,69,0.08)]">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <h4 className="font-display text-2xl text-[color:var(--foreground)]">
-                标签
-              </h4>
-              <div className="text-xs uppercase tracking-[0.2em] text-[color:var(--muted)]">
-                可多选
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              {tagsQuery.data?.map((tag) => {
-                const isSelected = form.tagIds.includes(tag.id)
-
-                return (
-                  <label
-                    key={tag.id}
-                    className={`inline-flex cursor-pointer items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition ${
-                      isSelected
-                        ? "bg-[color:var(--accent-strong)] text-white"
-                        : "bg-white/80 text-[color:var(--foreground)]"
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => toggleArrayValue("tagIds", tag.id)}
-                      className="sr-only"
-                    />
-                    {tag.name}
-                  </label>
-                )
-              })}
-            </div>
-          </div>
-
-          <div className="rounded-[32px] border border-[color:var(--line)] bg-[color:var(--surface)] p-6 shadow-[0_24px_80px_rgba(108,91,69,0.08)]">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <h4 className="font-display text-2xl text-[color:var(--foreground)]">
-                备注
-              </h4>
-              <div className="text-xs uppercase tracking-[0.2em] text-[color:var(--muted)]">
-                选填
-              </div>
-            </div>
-            <textarea
-              value={form.note}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, note: event.target.value }))
-              }
-              rows={5}
-              placeholder="记录口感、适合的做法、避雷点或下次复购判断。"
-              className={textareaClassName}
-            />
+            <label className="space-y-2 md:col-span-2">
+              <span className="text-sm font-semibold text-[color:var(--foreground)]">
+                规格
+              </span>
+              <input
+                value={form.specText}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, specText: event.target.value }))
+                }
+                placeholder="例如：1kg / 6 个装"
+                className={inputClassName}
+              />
+            </label>
           </div>
         </div>
 
-        <div className="space-y-4">
-          <div className="rounded-[32px] border border-[color:var(--line)] bg-[color:var(--surface)] p-6 shadow-[0_24px_80px_rgba(108,91,69,0.08)]">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <h4 className="font-display text-2xl text-[color:var(--foreground)]">
-                平台出现记录
-              </h4>
-              <div className="text-xs uppercase tracking-[0.2em] text-[color:var(--muted)]">
-                {props.mode === "create" ? "初始化" : "订单自动累积"}
-              </div>
-            </div>
-            {props.mode === "create" ? (
-              <div className="space-y-3">
-                <p className="text-sm leading-7 text-[color:var(--muted)]">
-                  新建商品时可以先勾一个初始平台，后续真实订单会继续补齐平台历史。
-                </p>
-                <div className="flex flex-wrap gap-3">
-                  {platformsQuery.data?.map((platform) => {
-                    const isSelected = form.platformCodes.includes(platform.code)
-
-                    return (
-                      <label
-                        key={platform.code}
-                        className={`inline-flex cursor-pointer items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition ${
-                          isSelected
-                            ? "bg-[color:var(--accent-strong)] text-white"
-                            : "bg-white/80 text-[color:var(--foreground)]"
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleArrayValue("platformCodes", platform.code)}
-                          className="sr-only"
-                        />
-                        {platform.label}
-                      </label>
-                    )
-                  })}
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-sm leading-7 text-[color:var(--muted)]">
-                  当前版本不直接手改平台集合。平台会随着订单归档自动累积，避免把“买过的平台”改成脱离历史事实的状态。
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {form.platformCodes.length > 0 ? (
-                    productQuery.data?.platforms.map((platform) => (
-                      <span
-                        key={platform.code}
-                        className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-stone-700"
-                      >
-                        {platform.label}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-stone-500">
-                      暂无平台记录
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="rounded-[32px] border border-[color:var(--line)] bg-white/75 p-6 shadow-[0_24px_80px_rgba(108,91,69,0.08)]">
+        <div className="rounded-[32px] border border-[color:var(--line)] bg-[color:var(--surface)] p-6 shadow-[0_24px_80px_rgba(108,91,69,0.08)]">
+          <div className="mb-3 flex items-center justify-between gap-3">
             <h4 className="font-display text-2xl text-[color:var(--foreground)]">
-              保存前检查
+              标签
             </h4>
-            <ul className="mt-4 space-y-3 text-sm leading-7 text-[color:var(--muted)]">
-              <li>商品名称和分类是必填。</li>
-              <li>标签、规格、备注都允许后补。</li>
-              <li>库存状态默认是“未知”，后续可在商品维护中调整。</li>
-            </ul>
-            {submitError ? (
-              <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {submitError}
-              </div>
-            ) : null}
+            <div className="text-xs uppercase tracking-[0.2em] text-[color:var(--muted)]">
+              可多选
+            </div>
           </div>
+          <div className="flex flex-wrap gap-3">
+            {tagsQuery.data?.map((tag) => {
+              const isSelected = form.tagIds.includes(tag.id)
+
+              return (
+                <label
+                  key={tag.id}
+                  className={`inline-flex cursor-pointer items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition ${
+                    isSelected
+                      ? "bg-[color:var(--accent-strong)] text-white"
+                      : "bg-white/80 text-[color:var(--foreground)]"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleArrayValue("tagIds", tag.id)}
+                    className="sr-only"
+                  />
+                  {tag.name}
+                </label>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="rounded-[32px] border border-[color:var(--line)] bg-[color:var(--surface)] p-6 shadow-[0_24px_80px_rgba(108,91,69,0.08)]">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h4 className="font-display text-2xl text-[color:var(--foreground)]">
+              备注
+            </h4>
+            <div className="text-xs uppercase tracking-[0.2em] text-[color:var(--muted)]">
+              选填
+            </div>
+          </div>
+          <textarea
+            value={form.note}
+            onChange={(event) =>
+              setForm((current) => ({ ...current, note: event.target.value }))
+            }
+            rows={5}
+            placeholder="记录口感、适合的做法、避雷点或下次复购判断。"
+            className={textareaClassName}
+          />
+          {submitError ? (
+            <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {submitError}
+            </div>
+          ) : null}
         </div>
       </section>
     </form>

@@ -53,7 +53,7 @@ export function DashboardScreen() {
             导入订单
           </h3>
           <p className="mt-2 text-sm leading-7 text-[color:var(--muted)]">
-            上传订单截图后，系统会自动解析并回填订单信息和商品内容。确认一次即可完成订单导入。
+            上传订单截图，系统智能解析订单信息和商品内容。确认后即可完成订单导入。
           </p>
         </Link>
       </section>

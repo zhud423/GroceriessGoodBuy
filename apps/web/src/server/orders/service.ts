@@ -9,6 +9,7 @@ import {
   ensureActiveTagIds,
   normalizeOptionalText
 } from "../catalog"
+import { ensureOwnedProduct, upsertProductAlias, refreshProductOrderAggregates } from "../products/helpers"
 import { RouteError, createValidationError } from "../route-error"
 import { getOrderImageUrl } from "../storage"
 
@@ -17,31 +18,6 @@ const IMPORT_COMMIT_TASK_PREFIX = "import-commit"
 
 function getImportCommitTaskKey(sessionId: string) {
   return `${IMPORT_COMMIT_TASK_PREFIX}:${sessionId}`
-}
-
-async function ensureOwnedProduct(
-  tx: TransactionClient,
-  userId: string,
-  productId: string,
-  fieldPath = "productId"
-) {
-  const product = await tx.product.findFirst({
-    where: {
-      id: productId,
-      userId
-    },
-    select: {
-      id: true
-    }
-  })
-
-  if (!product) {
-    throw createValidationError("Request validation failed.", {
-      [fieldPath]: "Referenced product does not exist."
-    })
-  }
-
-  return product
 }
 
 async function createProductInsideOrder(
@@ -85,167 +61,6 @@ async function createProductInsideOrder(
   }
 
   return product
-}
-
-async function upsertProductAlias(
-  tx: TransactionClient,
-  productId: string,
-  platform: Platform,
-  rawName: string
-) {
-  const normalizedName = normalizeProductName(rawName)
-
-  if (!normalizedName) {
-    return
-  }
-
-  await tx.productAlias.upsert({
-    where: {
-      productId_platform_normalizedName: {
-        productId,
-        platform,
-        normalizedName
-      }
-    },
-    update: {
-      rawName: rawName.trim()
-    },
-    create: {
-      productId,
-      platform,
-      rawName: rawName.trim(),
-      normalizedName
-    }
-  })
-}
-
-async function refreshProductOrderAggregates(
-  tx: TransactionClient,
-  userId: string,
-  productId: string,
-  platform: Platform
-) {
-  const latestOrderItem = await tx.orderItem.findFirst({
-    where: {
-      productId,
-      order: {
-        userId,
-        status: "ACTIVE"
-      }
-    },
-    select: {
-      order: {
-        select: {
-          orderedAt: true
-        }
-      }
-    },
-    orderBy: [
-      {
-        order: {
-          orderedAt: "desc"
-        }
-      },
-      {
-        createdAt: "desc"
-      }
-    ]
-  })
-
-  await tx.product.update({
-    where: {
-      id: productId
-    },
-    data: {
-      lastPurchasedAt: latestOrderItem?.order.orderedAt ?? null
-    }
-  })
-
-  const earliestPlatformItem = await tx.orderItem.findFirst({
-    where: {
-      productId,
-      order: {
-        userId,
-        platform,
-        status: "ACTIVE"
-      }
-    },
-    select: {
-      order: {
-        select: {
-          orderedAt: true
-        }
-      }
-    },
-    orderBy: [
-      {
-        order: {
-          orderedAt: "asc"
-        }
-      },
-      {
-        createdAt: "asc"
-      }
-    ]
-  })
-
-  const latestPlatformItem = await tx.orderItem.findFirst({
-    where: {
-      productId,
-      order: {
-        userId,
-        platform,
-        status: "ACTIVE"
-      }
-    },
-    select: {
-      order: {
-        select: {
-          orderedAt: true
-        }
-      }
-    },
-    orderBy: [
-      {
-        order: {
-          orderedAt: "desc"
-        }
-      },
-      {
-        createdAt: "desc"
-      }
-    ]
-  })
-
-  if (!earliestPlatformItem || !latestPlatformItem) {
-    await tx.productPlatform.deleteMany({
-      where: {
-        productId,
-        platform
-      }
-    })
-
-    return
-  }
-
-  await tx.productPlatform.upsert({
-    where: {
-      productId_platform: {
-        productId,
-        platform
-      }
-    },
-    update: {
-      firstSeenAt: earliestPlatformItem.order.orderedAt,
-      lastSeenAt: latestPlatformItem.order.orderedAt
-    },
-    create: {
-      productId,
-      platform,
-      firstSeenAt: earliestPlatformItem.order.orderedAt,
-      lastSeenAt: latestPlatformItem.order.orderedAt
-    }
-  })
 }
 
 export async function listOrdersForUser(userId: string, query: OrdersListQuery) {

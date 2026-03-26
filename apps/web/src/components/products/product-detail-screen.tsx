@@ -38,11 +38,14 @@ export function ProductDetailScreen({ productId }: { productId: string }) {
       <section className="rounded-[32px] border border-[color:var(--line)] bg-[color:var(--surface)] p-6 shadow-[0_24px_80px_rgba(108,91,69,0.08)]">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
+            <div className="text-xs uppercase tracking-[0.24em] text-[color:var(--muted)]">
+              PRODUCT DETAILS
+            </div>
             <h3 className="font-display text-3xl text-[color:var(--foreground)]">
               {product.displayName}
             </h3>
             <p className="mt-2 text-sm leading-7 text-[color:var(--muted)]">
-              {product.category.name} · 标准化名称 {product.normalizedName}
+              {product.category.name}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -55,36 +58,13 @@ export function ProductDetailScreen({ productId }: { productId: string }) {
             </Link>
           </div>
         </div>
-        <div className="mt-5 grid gap-4 md:grid-cols-3">
+        <div className="mt-5 grid gap-4 md:grid-cols-1">
           <div className="rounded-[24px] bg-white/80 p-4">
             <div className="text-xs uppercase tracking-[0.2em] text-[color:var(--muted)]">
               最近购买
             </div>
             <div className="mt-2 text-lg font-semibold text-[color:var(--foreground)]">
               {formatDatetime(product.lastPurchasedAt)}
-            </div>
-          </div>
-          <div className="rounded-[24px] bg-white/80 p-4">
-            <div className="text-xs uppercase tracking-[0.2em] text-[color:var(--muted)]">
-              规格
-            </div>
-            <div className="mt-2 text-lg font-semibold text-[color:var(--foreground)]">
-              {product.specText ?? "未填写"}
-            </div>
-          </div>
-          <div className="rounded-[24px] bg-white/80 p-4">
-            <div className="text-xs uppercase tracking-[0.2em] text-[color:var(--muted)]">
-              平台分布
-            </div>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {product.platforms.map((platform) => (
-                <span
-                  key={platform.code}
-                  className="rounded-full bg-stone-100 px-3 py-1 text-xs font-semibold text-stone-700"
-                >
-                  {platform.label}
-                </span>
-              ))}
             </div>
           </div>
         </div>

@@ -12,8 +12,7 @@ import {
 export const importSessionStatusSchema = z.enum([
   "DRAFT",
   "PROCESSING",
-  "REVIEW_REQUIRED",
-  "READY_TO_COMMIT",
+  "ANALYZED",
   "COMMITTED",
   "FAILED"
 ])

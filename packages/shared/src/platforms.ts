@@ -26,3 +26,7 @@ export function toPlatformOption(code: PlatformCode): PlatformOption {
     label: getPlatformLabel(code)
   }
 }
+
+export function isPlatformCode(value: string): value is PlatformCode {
+  return (PLATFORM_CODES as readonly string[]).includes(value)
+}

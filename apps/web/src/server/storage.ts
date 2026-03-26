@@ -3,6 +3,7 @@ import { RouteError } from "@/src/server/route-error"
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60
 const SIGNED_URL_CACHE_BUFFER_MS = 60 * 1000
+const MAX_SIGNED_URL_CACHE_SIZE = 5_000
 type StorageBucketEnvName =
   | "SUPABASE_STORAGE_BUCKET_ORDERS"
   | "SUPABASE_STORAGE_BUCKET_IMPORTS"
@@ -13,6 +14,36 @@ type SignedUrlCacheEntry = {
 }
 
 const signedUrlCache = new Map<string, SignedUrlCacheEntry>()
+
+function pruneSignedUrlCache() {
+  if (signedUrlCache.size <= MAX_SIGNED_URL_CACHE_SIZE) {
+    return
+  }
+
+  const now = Date.now()
+
+  // First, remove expired entries
+  for (const [key, entry] of signedUrlCache) {
+    if (entry.expiresAt <= now) {
+      signedUrlCache.delete(key)
+    }
+  }
+
+  // If still over limit, remove oldest 20%
+  if (signedUrlCache.size > MAX_SIGNED_URL_CACHE_SIZE) {
+    const deleteCount = Math.ceil(signedUrlCache.size * 0.2)
+    let deleted = 0
+
+    for (const key of signedUrlCache.keys()) {
+      if (deleted >= deleteCount) {
+        break
+      }
+
+      signedUrlCache.delete(key)
+      deleted++
+    }
+  }
+}
 
 function getConfiguredBucket(bucketEnvName: StorageBucketEnvName) {
   const bucket = process.env[bucketEnvName]?.trim()
@@ -75,6 +106,8 @@ async function createSignedStorageUrl(
       url: data.signedUrl,
       expiresAt: Date.now() + SIGNED_URL_TTL_SECONDS * 1000
     })
+
+    pruneSignedUrlCache()
 
     return data.signedUrl
   } catch (error) {

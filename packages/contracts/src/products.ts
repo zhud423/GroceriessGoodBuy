@@ -51,6 +51,16 @@ export const updateProductRequestSchema = z
 
 export type UpdateProductRequest = z.infer<typeof updateProductRequestSchema>
 
+export const bulkUpdateProductTagsRequestSchema = z.object({
+  productIds: z.array(z.string().trim().min(1)).min(1),
+  action: z.enum(["add", "remove"]),
+  tagId: z.string().trim().min(1)
+})
+
+export type BulkUpdateProductTagsRequest = z.infer<
+  typeof bulkUpdateProductTagsRequestSchema
+>
+
 export const productListItemDtoSchema = z.object({
   id: z.string(),
   displayName: z.string(),
@@ -133,4 +143,14 @@ export const mutateProductResponseSchema = createApiSuccessSchema(
 
 export type MutateProductResponse = {
   productId: string
+}
+
+export const bulkUpdateProductTagsResponseSchema = createApiSuccessSchema(
+  z.object({
+    updatedCount: z.number().int().nonnegative()
+  })
+)
+
+export type BulkUpdateProductTagsResponse = {
+  updatedCount: number
 }
