@@ -100,3 +100,8 @@ ARK_VISION_MODEL=你的_Endpoint_ID_或视觉_Model_ID
 - 商品与订单基础 CRUD
 - 真实用户鉴权与手机号验证
 - 截图导入草稿流转
+
+## 远端部署
+
+- 当前远端部署说明见：
+  - `doc/DEPLOYMENT_VERCEL_PHASE1_20260327.md`
