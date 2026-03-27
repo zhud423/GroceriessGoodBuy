@@ -1,8 +1,13 @@
+import { existsSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 
 import type { NextConfig } from "next"
 
-process.loadEnvFile?.(fileURLToPath(new URL("../../.env", import.meta.url)))
+const workspaceEnvPath = fileURLToPath(new URL("../../.env", import.meta.url))
+
+if (existsSync(workspaceEnvPath)) {
+  process.loadEnvFile?.(workspaceEnvPath)
+}
 
 const nextConfig: NextConfig = {
   transpilePackages: [
