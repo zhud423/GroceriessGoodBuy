@@ -37,43 +37,40 @@ export function LoginPanel() {
     <div className="rounded-[32px] border border-[color:var(--line)] bg-[color:var(--surface)] p-8 shadow-[0_24px_80px_rgba(108,91,69,0.12)] backdrop-blur">
       <div className="mb-8 space-y-3">
         <div className="inline-flex rounded-full border border-[color:var(--line)] bg-white/60 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--accent-strong)]">
-          Test Sign In
+          Sign In
         </div>
         <h1 className="font-display text-4xl leading-tight text-[color:var(--foreground)]">
-          先登录，再进入你的商品库和购物记录。
+          登录
         </h1>
         <p className="max-w-md text-sm leading-7 text-[color:var(--muted)]">
-          当前测试阶段使用简单账号密码登录，先把商品、订单和导入链路验证跑通。后续面向真实用户时，默认优先考虑手机号验证，而不是邮箱 OTP。
-        </p>
-        <p className="max-w-md text-xs leading-6 text-[color:var(--muted)]">
-          测试账号列表由根目录 `.env` 里的 `TEST_LOGIN_ACCOUNTS` 配置控制。
+          输入账号和密码继续。
         </p>
       </div>
 
       <form className="space-y-4" onSubmit={handleSignIn}>
         <label className="block space-y-2">
           <span className="text-sm font-medium text-[color:var(--foreground)]">
-            测试账号
+            账号
           </span>
           <input
             required
             value={username}
             onChange={(event) => setUsername(event.target.value)}
-            placeholder="输入测试账号"
+            placeholder="请输入账号"
             className="w-full rounded-2xl border border-[color:var(--line)] bg-white/80 px-4 py-3 text-base outline-none transition focus:border-[color:var(--accent)]"
           />
         </label>
 
         <label className="block space-y-2">
           <span className="text-sm font-medium text-[color:var(--foreground)]">
-            测试密码
+            密码
           </span>
           <input
             type="password"
             required
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            placeholder="输入测试密码"
+            placeholder="请输入密码"
             className="w-full rounded-2xl border border-[color:var(--line)] bg-white/80 px-4 py-3 text-base outline-none transition focus:border-[color:var(--accent)]"
           />
         </label>
@@ -83,7 +80,7 @@ export function LoginPanel() {
           disabled={isSubmitting}
           className="w-full rounded-2xl bg-[color:var(--accent-strong)] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isSubmitting ? "登录中..." : "登录并进入"}
+          {isSubmitting ? "登录中..." : "登录"}
         </button>
       </form>
 

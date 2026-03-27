@@ -26,13 +26,13 @@ export function LoginPage() {
         <div className="grid w-full gap-6 lg:grid-cols-[1.1fr_0.9fr]">
           <div className="hidden rounded-[36px] border border-[color:var(--line)] bg-[color:var(--surface)] p-10 shadow-[0_24px_80px_rgba(108,91,69,0.12)] lg:block">
             <div className="inline-flex rounded-full border border-[color:var(--line)] bg-white/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[color:var(--accent-strong)]">
-              Private Grocery Ledger
+              Groceries Good Buy
             </div>
             <h2 className="mt-6 font-display text-5xl leading-tight text-[color:var(--foreground)]">
-              把买过的东西、买过的价格和下次是否该回购，放进同一个入口。
+              登录后即可管理商品库与购物记录。
             </h2>
             <p className="mt-6 max-w-xl text-base leading-8 text-[color:var(--muted)]">
-              当前测试阶段先用最轻的账号密码登录，把商品、订单和导入主链路跑顺。等进入真实用户阶段，再单独设计手机号验证。
+              上传订单截图，系统会智能识别订单信息和商品内容，确认后即可完成导入。
             </p>
           </div>
           <div className="flex items-center">
